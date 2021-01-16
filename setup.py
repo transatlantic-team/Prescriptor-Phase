@@ -1,5 +1,5 @@
-# from setuptools import setup
+from setuptools import setup
 
-# setup(
-#     name="transat_rl", packages=["transat_rl"], install_requires=[]
-# )
+setup(
+    name="transat_rl", packages=["transat_rl"], install_requires=[]
+)
