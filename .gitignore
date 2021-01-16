@@ -1,0 +1,16 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local folders
+data/
+docs/
+.vscode/
+*.ipynb_checkpoints/
+*/__pycache__
+*.pyc
+
+*.DS_Store
+
+*.egg-info/
