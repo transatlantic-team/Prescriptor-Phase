@@ -40,10 +40,8 @@ predictor_script_path = (
 start_date = "2020-05-25"
 geoid = "France__"
 
-env = CovidEnv(
-    lookback_days, future_days, predictor_script_path, start_date, geoid, input_npis_path
-)
-
+env = CovidEnv(lookback_days, future_days, predictor_script_path, start_date,
+               geoid, input_npis_path)
 
 action = [[0 for _ in range(12)]]
 
