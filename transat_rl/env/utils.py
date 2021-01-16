@@ -1,7 +1,8 @@
 import os
 import urllib.request
-
+import shutil
 import pandas as pd
+import platform
 
 from transat_rl.env.constants import NPI_COLUMNS
 
@@ -69,3 +70,43 @@ def load_NPIs_filtered(
     df.reset_index(drop=True, inplace=True)
 
     return df
+
+
+def onerror(func, path, exc_info):
+    """
+    Error handler for ``shutil.rmtree``.
+
+    If the error is due to an access error (read only file)
+    it attempts to add write permission and then retries.
+
+    If the error is for another reason it re-raises the error.
+
+    Usage : ``shutil.rmtree(path, onerror=onerror)``
+    """
+    import stat
+    if not os.access(path, os.W_OK):
+        # Is the error an access error ?
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+    else:
+        raise
+
+def update_repo(repo='leaf-ai/covid-xprize',target_folder='covid-xprize-uptodate', overwrite=True):
+    if os.path.exists(f'./{target_folder}'):
+        if overwrite:
+            shutil.rmtree(f'./{target_folder}', onerror=onerror)
+            print(f'Overwriting...')
+        else:
+            print(f'{target_folder} already exists and not overwriting. Done.')
+            return
+    else:
+        print(f'Cloning...')
+    # Clone repo
+    if platform.system() == 'Windows':
+        os.system(f'cmd /c "git clone https://github.com/{repo}.git {target_folder}"')
+    else:
+        os.system(f"git clone https://github.com/{repo}.git {target_folder}")
+    # Delete .git dir and .gitignore to avoid errors in current repo
+    shutil.rmtree(f'./{target_folder}/.git', onerror=onerror)
+    os.remove(f'./{target_folder}/.gitignore')
+    print(f'Successfully cloned to {target_folder}')

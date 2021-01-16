@@ -6,6 +6,8 @@ __pycache__/
 # Local folders
 data/
 docs/
+false/
+covid-xprize-uptodate/
 .vscode/
 *.ipynb_checkpoints/
 */__pycache__

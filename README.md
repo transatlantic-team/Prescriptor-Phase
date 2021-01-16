@@ -2,7 +2,9 @@
 
 Repo for developing prescriptors based on an RL agent.
 
-## Setup environment (Conda):
+## Setup environment:
+
+### Base environment
 
 Analogous commands with python `venv`:
 
@@ -13,11 +15,24 @@ cd $HERE
 conda install -c conda-forge --file requirements.txt
 ```
 
-For installing pytorch, follow the instructions [here](https://pytorch.org/get-started/locally/).
-
-## Installing library (TODO)
+### Installing transatlantic RL library
 
 ```bash
 cd $HERE
 pip install .
+```
+
+### Installing standard predictor from XPrize repo
+
+```bash
+cd $HERE
+python ./update_xprize-repo.py
+cd covid-xprize-uptodate
+pip install .
+```
+
+### (Optional) Fix environment inconsistencies:
+
+```bash
+conda update --all
 ```
