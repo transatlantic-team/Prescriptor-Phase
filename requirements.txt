@@ -1,5 +1,6 @@
 matplotlib
 pandas
+seaborn
 gym
 notebook
 pylint
