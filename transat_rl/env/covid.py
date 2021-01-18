@@ -104,7 +104,7 @@ class CovidEnv(gym.Env):
         """
         # action: [0..4]^12
 
-        done = self.t >= self.T
+        done = self.t >= self.T - 1
         data_index = self.start_index + self.t
 
         # Overwrite ip file with action, save csv to call predict.py
@@ -123,12 +123,12 @@ class CovidEnv(gym.Env):
         end_date_str = pred_end_date.strftime("%Y-%m-%d")
 
         predictor_exe = self.predictor_exe_template.format(start_date_str, end_date_str)
-        print("Calling: ", predictor_exe)
+        # print("Calling: ", predictor_exe)
         os.system(f"{python_exe} {predictor_exe}")
 
         # Read predictions
         df_predictions = load_dataset(self.predictor_out_path)
-        new_cases = df_predictions.PredictedDailyNewCases.to_numpy()[0]
+        new_cases = df_predictions.PredictedDailyNewCases.to_numpy()[-1]
 
         # new observation
         obs = {
@@ -145,7 +145,7 @@ class CovidEnv(gym.Env):
         )
 
         # update history
-        if not(done):
+        if self.t + 1 < self.T:
             self.history["observations"][self.t + 1] = obs
         self.history["new_cases"][self.t] = new_cases
         self.history["reward"][self.t] = reward
@@ -159,14 +159,10 @@ class CovidEnv(gym.Env):
     def compute_reward(
         self, npis: np.ndarray, weights: np.ndarray, new_cases: np.ndarray
     ):
-        print(npis)
-        print(weights)
-        print(new_cases)
-        # economic_proxy = npis.T @ weights
-        # gamma = 1
-        # r0 = (new_cases[-1] - new_cases[-2]) / new_cases[-1] + 1
-        # return -(economic_proxy + gamma * r0)
-        return 0
+        economic_proxy = npis.T @ weights
+        gamma = 1
+        r0 = (new_cases[-1] - new_cases[-2]) / new_cases[-1] + 1
+        return -(economic_proxy + gamma * r0)
 
     def reset(self):
         """Resets the environment to an initial state and returns an initial

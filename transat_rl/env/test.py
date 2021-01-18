@@ -1,10 +1,11 @@
 import os
+from pprint import pprint
+
 import numpy as np
 import pandas as pd
 
 from transat_rl.env.utils import download_csv, load_NPIs_filtered
 from transat_rl.env.constants import LATEST_DATA_URL
-
 from transat_rl.env.covid import CovidEnv
 
 here = os.path.dirname(os.path.abspath(__file__))
@@ -32,12 +33,10 @@ input_npis_path = os.path.join(here, "data", "historic_NPIs_lastest.csv")
 input_npis_df.to_csv(input_npis_path, index=False)
 
 lookback_days = 10
-future_days = 10
+future_days = 3
 predictor_script_path = "/Users/romainegele/Documents/xPrize/covid-xprize/covid_xprize/standard_predictor/predict.py"
 
-env = CovidEnv(
-    lookback_days, future_days, predictor_script_path, oxford_csv_path
-)
+env = CovidEnv(lookback_days, future_days, predictor_script_path, oxford_csv_path)
 
 EPISODES = 1
 
@@ -46,7 +45,7 @@ for episode in range(EPISODES):
     obs = env.reset()
     done = False
     t = 0
-    while not(done):
+    while not (done):
         print(f"t={t}")
         action = [[0 for _ in range(12)]]
         obs, rew, done, info = env.step(action)
@@ -56,3 +55,6 @@ for episode in range(EPISODES):
         t += 1
 
     break
+
+print("<- HISTORY ->")
+pprint(env.history)
