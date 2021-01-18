@@ -26,6 +26,39 @@ def load_dataset(url):
     latest_df["RegionName"] = latest_df["RegionName"].fillna("")
     return latest_df
 
+def preprocess_historical_basic(oxford_csv_path: str, geoids: list):
+    """Create a copy of preprocessed data from OxCGRT dataframe"""
+
+    df = load_dataset(oxford_csv_path)
+
+    # Add RegionID column that combines CountryName and RegionName for easier manipulation of data
+    df["GeoID"] = df["CountryName"] + "__" + df["RegionName"].astype(str)
+
+    # Remove GeoID not considered in the competition
+    df = df[df["GeoID"].isin(geoids)]
+
+    # Add new cases column
+    df["NewCases"] = df.groupby("GeoID").ConfirmedCases.diff().fillna(0)
+    df.loc[df.NewCases < 0, "NewCases"] = 0
+
+    df["NewCasesSmoothed7Days"] = df.groupby("GeoID").NewCases.rolling(7, win_type=None).mean().fillna(0).reset_index(level=0, drop=True) #.reset_index()
+
+    # Keep only columns of interest
+    id_cols = ["CountryName", "RegionName", "GeoID", "Date", "ConfirmedCases", "NewCases", "NewCasesSmoothed7Days"]
+
+    df = df[id_cols + NPI_COLUMNS]
+
+    # Fill any missing case values by interpolation and setting NaNs to 0
+    df.update(
+        df.groupby("GeoID").NewCases.apply(lambda group: group.interpolate()).fillna(0)
+    )
+
+    # Fill any missing NPIs by assuming they are the same as previous day
+    for npi_col in NPI_COLUMNS:
+        df.update(df.groupby("GeoID")[npi_col].ffill().fillna(0))
+
+    return df
+
 
 def load_NPIs_filtered(
     data_file="./data/OxCGRT_latest.csv", countries_regions_file="./data/kept_regions.csv"

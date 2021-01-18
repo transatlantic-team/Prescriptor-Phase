@@ -23,8 +23,9 @@ if download:
     # download latest version of Oxford dataset
     download_csv(LATEST_DATA_URL, "OxCGRT_latest", dest_folder=data_folder)
 
+oxford_csv_path = os.path.join(data_folder, "OxCGRT_latest.csv")
 input_npis_df = load_NPIs_filtered(
-    os.path.join(data_folder, "OxCGRT_latest.csv"),
+    oxford_csv_path,
     os.path.join(data_folder, "kept_regions.csv"),
 )
 input_npis_path = os.path.join(here, "data", "historic_NPIs_lastest.csv")
@@ -32,17 +33,26 @@ input_npis_df.to_csv(input_npis_path, index=False)
 
 lookback_days = 10
 future_days = 10
-predictor_script_path = (
-    "/Users/romainegele/Documents/xPrize/covid-xprize/covid_xprize/standard_predictor/predict.py"
+predictor_script_path = "/Users/romainegele/Documents/xPrize/covid-xprize/covid_xprize/standard_predictor/predict.py"
+
+env = CovidEnv(
+    lookback_days, future_days, predictor_script_path, oxford_csv_path
 )
 
-# these parameters could be sampled "randomly" during training to generate new episodes
-start_date = "2020-05-25"
-geoid = "France__"
+EPISODES = 1
 
-env = CovidEnv(lookback_days, future_days, predictor_script_path, start_date,
-               geoid, input_npis_path)
+for episode in range(EPISODES):
 
-action = [[0 for _ in range(12)]]
+    obs = env.reset()
+    done = False
+    t = 0
+    while not(done):
+        print(f"t={t}")
+        action = [[0 for _ in range(12)]]
+        obs, rew, done, info = env.step(action)
+        print(f"obs: {obs}")
+        print(f"rew: {rew}")
+        print(f"done: {done}")
+        t += 1
 
-observation, reward, done, info = env.step(action)
+    break

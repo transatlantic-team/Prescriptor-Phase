@@ -16,3 +16,5 @@ covid-xprize-uptodate/
 *.DS_Store
 
 *.egg-info/
+transat_rl/env/predictor_input.csv
+transat_rl/env/predictor_output.csv
