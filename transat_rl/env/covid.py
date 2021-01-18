@@ -28,10 +28,10 @@ class CovidEnv(gym.Env):
 
     def __init__(
         self,
-        lookback_days: int,
         future_days: int,
         predictor_script_path: str,
         oxford_csv_path: str,
+        lookback_days: int=1,
         geoids: list = ["France__"],
     ):
         super().__init__()
@@ -74,17 +74,17 @@ class CovidEnv(gym.Env):
 
         # ACTION SPACE
         # Each NPI has a value between 0 anf 4 per timestep --> 5 discrete actions per country
-        self.action_space = spaces.Box(low=0, high=4, dtype=int, shape=(1, self.N_npis))
+        self.action_space = spaces.Box(low=0, high=4, dtype=int, shape=(self.N_npis,))
 
         # OBSERVATION SPACE
         # State of the system is past (NPIs, cases)
         self.observation_space = spaces.dict.Dict(
             {
                 "npis": spaces.Box(
-                    low=0, high=4, dtype=int, shape=(self.N_npis, self.lookback_days)
+                    low=0, high=4, dtype=int, shape=(self.N_npis,)
                 ),
                 "new_cases": spaces.Box(
-                    low=0, high=np.inf, dtype=int, shape=(self.lookback_days,)
+                    low=0, high=100000000, dtype=int, shape=()
                 ),
             }
         )
@@ -108,7 +108,7 @@ class CovidEnv(gym.Env):
         data_index = self.start_index + self.t
 
         # Overwrite ip file with action, save csv to call predict.py
-        self.df_npis_episode.loc[data_index, NPI_COLUMNS] = action[0]
+        self.df_npis_episode.loc[data_index, NPI_COLUMNS] = action
         self.df_npis_episode.to_csv(self.predictor_inp_path, index=False)
 
         print("date: ", self.df_npis_episode.Date[data_index])
@@ -132,7 +132,7 @@ class CovidEnv(gym.Env):
 
         # new observation
         obs = {
-            "npis": action[0],
+            "npis": action,
             "new_cases": new_cases,
         }
 
@@ -149,7 +149,7 @@ class CovidEnv(gym.Env):
             self.history["observations"][self.t + 1] = obs
         self.history["new_cases"][self.t] = new_cases
         self.history["reward"][self.t] = reward
-        self.history["prescriptions"][self.t] = action[0]
+        self.history["prescriptions"][self.t] = action
 
         # update step in episode
         self.t += 1
@@ -199,6 +199,7 @@ class CovidEnv(gym.Env):
         }
 
         self.history = {
+            "geoid": self.geoid_episode,
             "observations": [None for _ in range(self.T)],
             "new_cases": np.zeros(self.T),
             "reward": np.zeros(self.T),

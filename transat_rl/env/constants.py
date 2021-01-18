@@ -1,3 +1,7 @@
+import os
+
+ENV_PATH = os.path.dirname(os.path.abspath(__file__))
+
 NPI_COLUMNS = [
     'C1_School closing', 'C2_Workplace closing', 'C3_Cancel public events',
     'C4_Restrictions on gatherings', 'C5_Close public transport',
@@ -9,3 +13,5 @@ ID_COLUMNS = ['CountryName', 'RegionName', 'GeoID', 'Date']
 CASES_COLUMN = ['NewCases']
 
 LATEST_DATA_URL = 'https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_latest.csv'
+
+OXFORD_CSV_PATH = os.path.join(ENV_PATH, "data", "OxCGRT_latest.csv")
