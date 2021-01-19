@@ -28,10 +28,11 @@ class CovidEnv(gym.Env):
 
     def __init__(
         self,
-        future_days: int,
         predictor_script_path: str,
         oxford_csv_path: str,
-        lookback_days: int=1,
+        future_days: int=7,
+        lookback_days: int=7,
+        episode_length: int=2,
         geoids: list = ["France__"],
     ):
         super().__init__()
@@ -62,7 +63,8 @@ class CovidEnv(gym.Env):
 
         # Static attributes
         self.lookback_days = lookback_days
-        self.T = future_days  # episode length for simulation
+        self.future_days = future_days
+        self.T = episode_length  # episode length for simulation
 
         # Output management
         self.predictor_inp_path = os.path.join(here, "predictor_input.csv")
@@ -81,10 +83,10 @@ class CovidEnv(gym.Env):
         self.observation_space = spaces.dict.Dict(
             {
                 "npis": spaces.Box(
-                    low=0, high=4, dtype=int, shape=(self.N_npis,)
+                    low=0, high=4, dtype=int, shape=(self.lookback_days, self.N_npis,)
                 ),
                 "new_cases": spaces.Box(
-                    low=0, high=100000000, dtype=int, shape=()
+                    low=0, high=100000000, dtype=int, shape=(self.lookback_days,)
                 ),
             }
         )
@@ -102,19 +104,26 @@ class CovidEnv(gym.Env):
             done (bool): whether the episode has ended, in which case further step() calls will return undefined results
             info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
-        # action: [0..4]^12
-
         done = self.t >= self.T - 1
-        data_index = self.start_index + self.t
+        start_index = self.start_index + self.t
+        end_index = start_index + self.future_days - 1
 
         # Overwrite ip file with action, save csv to call predict.py
-        self.df_npis_episode.loc[data_index, NPI_COLUMNS] = action
+        i = len(self.df_npis_episode)
+        sample_row = self.df_npis_episode.iloc[i-1].tolist()
+        while end_index >= len(self.df_npis_episode):
+            sample_row = sample_row[:]
+            sample_row[2] +=  DAY
+            self.df_npis_episode.loc[i] = sample_row
+            i += 1
+
+        self.df_npis_episode.loc[start_index:end_index, NPI_COLUMNS] = action
+
         self.df_npis_episode.to_csv(self.predictor_inp_path, index=False)
 
-        print("date: ", self.df_npis_episode.Date[data_index])
         # Run predictor
         pred_start_date = self.df_npis_episode.Date[self.start_index]
-        pred_end_date = self.df_npis_episode.Date[data_index]
+        pred_end_date = self.df_npis_episode.Date[end_index]
 
         start_date_str = pred_start_date.strftime("%Y-%m-%d")
         end_date_str = pred_end_date.strftime("%Y-%m-%d")
@@ -124,27 +133,32 @@ class CovidEnv(gym.Env):
         os.system(f"{python_exe} {predictor_exe}")
 
         # Read predictions
-        df_predictions = load_dataset(self.predictor_out_path)
-        new_cases = df_predictions.PredictedDailyNewCases.to_numpy()[-1]
+        df_predictions = load_dataset(self.predictor_out_path).iloc[-self.future_days:]
+        new_cases = df_predictions.PredictedDailyNewCases.to_numpy()
+        print("new_cases: ", new_cases)
 
         # new observation
+        pre_new_cases = self.history["observations"][self.t]["new_cases"]
+        obs_new_cases = np.concatenate([pre_new_cases[1:], new_cases[:1]])
+        pre_npis = self.history["observations"] [self.t]["npis"]
+        npis = np.array(action).reshape(1, -1)
+        obs_npis = np.concatenate([pre_npis[1:], npis])
         obs = {
-            "npis": action,
-            "new_cases": new_cases,
+            "npis": obs_npis,
+            "new_cases": obs_new_cases,
         }
 
-        print("new_cases: ", new_cases)
         # compute reward
         reward = self.compute_reward(
-            np.array(obs["npis"]),
+            obs["npis"],
             self.weights,
-            np.array([self.history["observations"][self.t]["new_cases"], new_cases]),
+            new_cases,
         )
 
         # update history
         if self.t + 1 < self.T:
             self.history["observations"][self.t + 1] = obs
-        self.history["new_cases"][self.t] = new_cases
+        self.history["new_cases"][self.t, :] = new_cases
         self.history["reward"][self.t] = reward
         self.history["prescriptions"][self.t] = action
 
@@ -156,10 +170,11 @@ class CovidEnv(gym.Env):
     def compute_reward(
         self, npis: np.ndarray, weights: np.ndarray, new_cases: np.ndarray
     ):
-        economic_proxy = npis.T @ weights
+        economic_proxy = np.sum(npis @ weights.reshape(-1, 1))
         gamma = 1
-        r0 = (new_cases[-1] - new_cases[-2]) / new_cases[-1] + 1
-        return -(economic_proxy + gamma * r0)
+        r0 = np.diff(new_cases) / new_cases[1:] + 1
+        sum_r0 = r0.sum()
+        return -(economic_proxy + gamma * sum_r0)
 
     def reset(self):
         """Resets the environment to an initial state and returns an initial
@@ -183,22 +198,26 @@ class CovidEnv(gym.Env):
 
         self.df_npis_episode = self.data_episode[self.base_columns + NPI_COLUMNS]
 
-        d = 30
+        d = self.lookback_days
         self.start_index = np.random.randint(len(self.data_episode) - self.T - d) + d
         self.t = 0  # current step
 
         # retrieve "self.weights" corresponding to "self.geoid_episode"
 
-        data_previous_day = self.data_episode.iloc[self.start_index - 1]
+        data_previous_days = self.data_episode.iloc[
+            self.start_index - self.lookback_days : self.start_index
+        ]
+
+        data_previous_days["NewCasesSmoothed7Days"].to_numpy()
         obs = {
-            "npis": data_previous_day[NPI_COLUMNS].astype(int).tolist(),
-            "new_cases": data_previous_day["NewCasesSmoothed7Days"],
+            "npis": data_previous_days[NPI_COLUMNS].astype(int).to_numpy(),
+            "new_cases": data_previous_days["NewCasesSmoothed7Days"].to_numpy(),
         }
 
         self.history = {
             "geoid": self.geoid_episode,
             "observations": [None for _ in range(self.T)],
-            "new_cases": np.zeros(self.T),
+            "new_cases": np.zeros((self.T, self.future_days)),
             "reward": np.zeros(self.T),
             "prescriptions": np.zeros((self.T, self.N_npis)),
         }

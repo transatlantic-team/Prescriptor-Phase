@@ -185,10 +185,10 @@ class CovidBaselineEnv(gym.Env):
 
         # retrieve "self.weights" corresponding to "self.geoid_episode"
 
-        data_previous_day = self.data_episode.iloc[
+        data_previous_days = self.data_episode.iloc[
             self.start_index - self.lookback_days : self.start_index
         ]
-        obs = data_previous_day["NewCasesSmoothed7Days"].to_numpy()
+        obs = data_previous_days["NewCasesSmoothed7Days"].to_numpy()
 
         self.history = {
             "geoid": self.geoid_episode,
