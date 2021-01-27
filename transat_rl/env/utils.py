@@ -1,10 +1,11 @@
+import json
 import os
-import urllib.request
-import shutil
-import pandas as pd
 import platform
+import shutil
+import urllib.request
 
-from transat_rl.env.constants import NPI_COLUMNS
+import pandas as pd
+from transat_rl.env.constants import NPI_BOUNDS_PATH, NPI_COLUMNS
 
 
 def download_csv(CSV_URL, fname, dest_folder="./data"):
@@ -26,6 +27,7 @@ def load_dataset(url):
     latest_df["RegionName"] = latest_df["RegionName"].fillna("")
     return latest_df
 
+
 def preprocess_historical_basic(oxford_csv_path: str, geoids: list):
     """Create a copy of preprocessed data from OxCGRT dataframe"""
 
@@ -41,10 +43,24 @@ def preprocess_historical_basic(oxford_csv_path: str, geoids: list):
     df["NewCases"] = df.groupby("GeoID").ConfirmedCases.diff().fillna(0)
     df.loc[df.NewCases < 0, "NewCases"] = 0
 
-    df["NewCasesSmoothed7Days"] = df.groupby("GeoID").NewCases.rolling(7, win_type=None).mean().fillna(0).reset_index(level=0, drop=True) #.reset_index()
+    df["NewCasesSmoothed7Days"] = (
+        df.groupby("GeoID")
+        .NewCases.rolling(7, win_type=None)
+        .mean()
+        .fillna(0)
+        .reset_index(level=0, drop=True)
+    )  # .reset_index()
 
     # Keep only columns of interest
-    id_cols = ["CountryName", "RegionName", "GeoID", "Date", "ConfirmedCases", "NewCases", "NewCasesSmoothed7Days"]
+    id_cols = [
+        "CountryName",
+        "RegionName",
+        "GeoID",
+        "Date",
+        "ConfirmedCases",
+        "NewCases",
+        "NewCasesSmoothed7Days",
+    ]
 
     df = df[id_cols + NPI_COLUMNS]
 
@@ -117,6 +133,7 @@ def onerror(func, path, exc_info):
     Usage : ``shutil.rmtree(path, onerror=onerror)``
     """
     import stat
+
     if not os.access(path, os.W_OK):
         # Is the error an access error ?
         os.chmod(path, stat.S_IWUSR)
@@ -124,22 +141,31 @@ def onerror(func, path, exc_info):
     else:
         raise
 
-def update_repo(repo='leaf-ai/covid-xprize',target_folder='covid-xprize-uptodate', overwrite=True):
-    if os.path.exists(f'./{target_folder}'):
+
+def update_repo(
+    repo="leaf-ai/covid-xprize", target_folder="covid-xprize-uptodate", overwrite=True
+):
+    if os.path.exists(f"./{target_folder}"):
         if overwrite:
-            shutil.rmtree(f'./{target_folder}', onerror=onerror)
-            print(f'Overwriting...')
+            shutil.rmtree(f"./{target_folder}", onerror=onerror)
+            print(f"Overwriting...")
         else:
-            print(f'{target_folder} already exists and not overwriting. Done.')
+            print(f"{target_folder} already exists and not overwriting. Done.")
             return
     else:
-        print(f'Cloning...')
+        print(f"Cloning...")
     # Clone repo
-    if platform.system() == 'Windows':
+    if platform.system() == "Windows":
         os.system(f'cmd /c "git clone https://github.com/{repo}.git {target_folder}"')
     else:
         os.system(f"git clone https://github.com/{repo}.git {target_folder}")
     # Delete .git dir and .gitignore to avoid errors in current repo
-    shutil.rmtree(f'./{target_folder}/.git', onerror=onerror)
-    os.remove(f'./{target_folder}/.gitignore')
-    print(f'Successfully cloned to {target_folder}')
+    shutil.rmtree(f"./{target_folder}/.git", onerror=onerror)
+    os.remove(f"./{target_folder}/.gitignore")
+    print(f"Successfully cloned to {target_folder}")
+
+
+def get_npi_bounds():
+    with open(NPI_BOUNDS_PATH, "r") as f:
+        npi_bounds = json.load(f)
+    return npi_bounds

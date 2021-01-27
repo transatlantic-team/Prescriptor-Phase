@@ -15,3 +15,4 @@ CASES_COLUMN = ['NewCases']
 LATEST_DATA_URL = 'https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_latest.csv'
 
 OXFORD_CSV_PATH = os.path.join(ENV_PATH, "data", "OxCGRT_latest.csv")
+NPI_BOUNDS_PATH = os.path.join(ENV_PATH, "data", "npi_bounds.json")

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from gym import spaces
 from transat_rl.env.constants import NPI_COLUMNS
-from transat_rl.env.utils import load_dataset, preprocess_historical_basic
+from transat_rl.env.utils import load_dataset, preprocess_historical_basic, get_npi_bounds
 
 here = os.path.dirname(os.path.abspath(__file__))
 python_exe = sys.executable
@@ -30,9 +30,9 @@ class CovidEnv(gym.Env):
         self,
         predictor_script_path: str,
         oxford_csv_path: str,
-        future_days: int=7,
-        lookback_days: int=7,
-        episode_length: int=2,
+        future_days: int = 7,
+        lookback_days: int = 7,
+        episode_length: int = 2,
         geoids: list = ["France__"],
     ):
         super().__init__()
@@ -41,6 +41,9 @@ class CovidEnv(gym.Env):
         self.geoids = geoids
         # Load all data necessary for the environment: cumulative cases, new cases, new cases 7-smooth, NPIs
         self.data = preprocess_historical_basic(oxford_csv_path, geoids)
+
+        npi_bounds = get_npi_bounds()
+        self.npi_bounds = [npi_bounds[k] for k in NPI_COLUMNS]
 
         # self.weights_data = pd.read_csv(
         #     weights_file, sep=",", dtype={"country_name": str, "region_name": str}
@@ -83,7 +86,13 @@ class CovidEnv(gym.Env):
         self.observation_space = spaces.dict.Dict(
             {
                 "npis": spaces.Box(
-                    low=0, high=4, dtype=int, shape=(self.lookback_days, self.N_npis,)
+                    low=0,
+                    high=4,
+                    dtype=int,
+                    shape=(
+                        self.lookback_days,
+                        self.N_npis,
+                    ),
                 ),
                 "new_cases": spaces.Box(
                     low=0, high=100000000, dtype=int, shape=(self.lookback_days,)
@@ -104,16 +113,19 @@ class CovidEnv(gym.Env):
             done (bool): whether the episode has ended, in which case further step() calls will return undefined results
             info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
+        action = self.clip_action(action)
+        print(action)
+
         done = self.t >= self.T - 1
         start_index = self.start_index + self.t
         end_index = start_index + self.future_days - 1
 
         # Overwrite ip file with action, save csv to call predict.py
         i = len(self.df_npis_episode)
-        sample_row = self.df_npis_episode.iloc[i-1].tolist()
+        sample_row = self.df_npis_episode.iloc[i - 1].tolist()
         while end_index >= len(self.df_npis_episode):
             sample_row = sample_row[:]
-            sample_row[2] +=  DAY
+            sample_row[2] += DAY
             self.df_npis_episode.loc[i] = sample_row
             i += 1
 
@@ -133,14 +145,14 @@ class CovidEnv(gym.Env):
         os.system(f"{python_exe} {predictor_exe}")
 
         # Read predictions
-        df_predictions = load_dataset(self.predictor_out_path).iloc[-self.future_days:]
+        df_predictions = load_dataset(self.predictor_out_path).iloc[-self.future_days :]
         new_cases = df_predictions.PredictedDailyNewCases.to_numpy()
-        print("new_cases: ", new_cases)
+        # print("new_cases: ", new_cases)
 
         # new observation
         pre_new_cases = self.history["observations"][self.t]["new_cases"]
         obs_new_cases = np.concatenate([pre_new_cases[1:], new_cases[:1]])
-        pre_npis = self.history["observations"] [self.t]["npis"]
+        pre_npis = self.history["observations"][self.t]["npis"]
         npis = np.array(action).reshape(1, -1)
         obs_npis = np.concatenate([pre_npis[1:], npis])
         obs = {
@@ -257,3 +269,11 @@ class CovidEnv(gym.Env):
                     super(MyEnv, self).render(mode=mode) # just raise an exception
         """
         ...
+
+    def clip_action(self, action):
+        return np.array(
+            [
+                np.clip(a, a_min, a_max)
+                for a, (a_min, a_max) in zip(action, self.npi_bounds)
+            ]
+        )
