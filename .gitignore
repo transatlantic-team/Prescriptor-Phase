@@ -7,6 +7,7 @@ __pycache__/
 data/
 docs/
 false/
+dev/
 covid-xprize-uptodate/
 .vscode/
 *.ipynb_checkpoints/
@@ -16,5 +17,3 @@ covid-xprize-uptodate/
 *.DS_Store
 
 *.egg-info/
-transat_rl/env/predictor_input.csv
-transat_rl/env/predictor_output.csv
