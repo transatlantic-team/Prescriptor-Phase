@@ -4,10 +4,9 @@ __pycache__/
 *$py.class
 
 # Local folders
-data/
-docs/
 false/
 dev/
+docs/
 covid-xprize-uptodate/
 .vscode/
 *.ipynb_checkpoints/
